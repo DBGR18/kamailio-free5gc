@@ -1,0 +1,82 @@
+# kamailio-free5gc
+
+Running an IMS on top of a 5G core, built up one verified step at a time.
+
+## Goal
+
+5G gives you authentication, an IP address, and a data tunnel. It does not give
+you phone calls. Calls are IMS: a separate system that speaks SIP and decides
+who is ringing whom.
+
+This repository connects the two:
+
+- **free5gc** — the 5G core (registration, PDU sessions, user-plane forwarding)
+- **Kamailio** — the IMS side (SIP registration and call routing)
+- They meet at **N6**, the interface where the UPF hands traffic to an external
+  network. To the 5G core, IMS is just a server sitting out on a data network.
+
+The point is that this connection is *real*. The two sides live on separate
+Docker networks, so a UE can only reach Kamailio by going through the UPF —
+there is no shortcut path, and no NAT hiding who sent what.
+
+## Where this is going
+
+Today Kamailio is a general-purpose SIP proxy that happens to look like an IMS.
+Turning it into an actual IMS means:
+
+1. **A dedicated `ims` DNN** so IMS traffic rides its own PDU session
+2. **An HSS** — a real identity source, so registration is authenticated
+   instead of trusted
+3. **Splitting P-CSCF / I-CSCF / S-CSCF** into their proper roles
+4. **N5 toward the PCF** so voice gets its own QoS treatment
+5. **P-CSCF discovery via PCO** instead of a hardcoded address
+
+Each step is ordered so that the one before it becomes verifiable.
+
+## Status
+
+The 5G core and the IMS proxy come up and talk to each other. The RAN and UE
+side is mid-migration from UERANSIM to
+[free-ran-ue](https://github.com/free-ran-ue/free-ran-ue), so there is no UE in
+`docker-compose.yaml` right now — `01-up.sh` brings up everything except the
+radio and stops there.
+
+## Quick start
+
+```bash
+./scripts/00-setup-gtp5g.sh   # build + load the kernel module
+./scripts/01-up.sh            # core network, IMS, and subscribers
+./scripts/99-down.sh          # tear everything down
+```
+
+Requirements: Docker with Compose, `linux-headers` matching the running kernel,
+and passwordless `sudo` (loading a kernel module needs it).
+
+**gtp5g is not vendored here.** It is an out-of-tree kernel module and has to be
+rebuilt after every kernel upgrade. The scripts expect a checkout at `~/gtp5g`
+on `master`; set `GTP5G_DIR` if yours lives elsewhere.
+
+## Layout
+
+| Path | What it is |
+|---|---|
+| `docker-compose.yaml` | The whole topology: two networks, one UPF bridging them |
+| `config/` | free5gc network function configs |
+| `kamailio/` | Kamailio image and routing config |
+| `scripts/` | Bring-up, provisioning, teardown |
+
+Design notes, the reasoning behind each decision, and the problems hit along the
+way are being written up under `docs/` (not tracked yet).
+
+## Versions
+
+| Component | Version | Note |
+|---|---|---|
+| free5gc | v4.2.3 | Docker images |
+| gtp5g | master (0.10.2) | Host kernel module, builds clean on Linux 7.x |
+| Kamailio | 6.x | Built from the Debian package |
+
+free5gc's UPF enforces a gtp5g version range, and it changed between releases:
+v4.2.0 and v4.2.1 accept `0.9.5 <= v < 0.10.0`, while v4.2.2 and later widened it
+to `0.9.5 <= v < 0.11.0`. Trust `internal/forwarder/gtp5g.go` over the go-upf
+README — the two disagree.
