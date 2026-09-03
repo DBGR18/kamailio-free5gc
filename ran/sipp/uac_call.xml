@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+
+<!-- Caller side: UE1 dials UE2 through Kamailio.
+
+     [field0] = caller user part, [field1] = callee user part (from -inf CSV).
+     The INVITE is addressed to the callee AT THE PROXY; Kamailio resolves it
+     to the contact the callee registered with, which is an address inside
+     the UE IP pool (10.60.0.0/16) reachable only through the UPF.
+
+     rrs="true" on the 200 stores the Record-Route set so that ACK and BYE
+     carry the [routes] header and travel back through the proxy. -->
+<scenario name="UE outgoing call">
+
+  <send retrans="500">
+    <![CDATA[
+
+      INVITE sip:[field1]@[remote_ip] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      Max-Forwards: 70
+      From: <sip:[field0]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[field1]@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:[field0]@[local_ip]:[local_port];transport=[transport]>
+      User-Agent: SIPp-UE
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=[field0] 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+      s=free5gc-kamailio-poc
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+
+    ]]>
+  </send>
+
+  <recv response="100" optional="true"/>
+  <recv response="180" optional="true"/>
+  <recv response="183" optional="true"/>
+
+  <recv response="200" rtd="true" rrs="true">
+    <action>
+      <log message="call answered by [field1]"/>
+    </action>
+  </recv>
+
+  <send>
+    <![CDATA[
+
+      ACK [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      Max-Forwards: 70
+      From: <sip:[field0]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[field1]@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      [routes]
+      Contact: <sip:[field0]@[local_ip]:[local_port];transport=[transport]>
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Talk: replay a real G.711 stream so actual RTP crosses the GTP-U
+       tunnel. This is the part that proves the 5G user plane carries media,
+       not just signalling. -->
+  <nop>
+    <action>
+      <exec play_pcap_audio="/usr/share/sip-tester/g711a.pcap"/>
+    </action>
+  </nop>
+
+  <pause milliseconds="5000"/>
+
+  <send retrans="500">
+    <![CDATA[
+
+      BYE [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      Max-Forwards: 70
+      From: <sip:[field0]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[field1]@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 2 BYE
+      [routes]
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv response="200" crlf="true">
+    <action>
+      <log message="call released"/>
+    </action>
+  </recv>
+
+</scenario>

@@ -1,0 +1,51 @@
+# free-ran-ue gNB.
+#
+# The gNB lives on the core network (10.100.200.0/24) and bridges two worlds:
+#   N2  NGAP/SCTP to the AMF          -- signalling
+#   N3  GTP-U to the UPF              -- user plane
+# and it listens on two more ports that the UE containers dial in on, standing
+# in for the radio link.
+gnb:
+  amfN2Ip: "10.100.200.16" # AMF (poc-amf)
+  ranN2Ip: "10.100.200.40" # this gNB
+  upfN3Ip: "10.100.200.30" # UPF (poc-upf), core-network side
+  ranN3Ip: "10.100.200.40" # this gNB
+
+  # The simulated radio link. The UE containers connect here, so this must be
+  # an address they can reach -- never 127.0.0.1.
+  ranControlPlaneIp: "10.100.200.40"
+  ranDataPlaneIp: "10.100.200.40"
+
+  amfN2Port: 38412
+  ranN2Port: 38413
+  upfN3Port: 2152
+  ranN3Port: 2152
+
+  ranControlPlanePort: 31413
+  ranDataPlanePort: 31414
+
+  gnbId: "000314"
+  gnbName: "poc-gnb"
+
+  plmnId:
+    mcc: "208"
+    mnc: "93"
+
+  # Must match amfcfg.yaml's supportTaiList.
+  tai:
+    tac: "000001"
+    broadcastPlmnId:
+      mcc: "208"
+      mnc: "93"
+
+  # Must match the slice configured in smfcfg.yaml and the UE subscription.
+  snssai:
+    sst: "1"
+    sd: "010203"
+
+  api:
+    ip: "10.100.200.40"
+    port: 40104
+
+logger:
+  level: "info" # error, warn, info, debug, trace, test

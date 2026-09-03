@@ -235,6 +235,70 @@ services:
       - nrf
 
 
+  # ------------------------------------------------------------- RAN and UEs
+  # free-ran-ue does GTP-U in user space, so unlike the UPF these containers
+  # need no gtp5g -- only NET_ADMIN, to bring up their own TUN device.
+  gnb:
+    container_name: poc-gnb
+    image: poc/ran:latest
+    build: ./ran
+    entrypoint: ["/entrypoint-gnb.sh"]
+    volumes:
+      - ./config/gnb.yaml:/ran/config/gnb.yaml:ro
+    cap_add:
+      - NET_ADMIN
+    networks:
+      corenet:
+        ipv4_address: 10.100.200.40
+        aliases:
+          - gnb.free5gc.org
+    depends_on:
+      - amf
+      - upf
+
+  ue1:
+    container_name: poc-ue1
+    image: poc/ran:latest
+    build: ./ran
+    entrypoint: ["/entrypoint-ue.sh"]
+    volumes:
+      - ./config/ue-ue1.yaml:/ran/config/ue.yaml:ro
+    environment:
+      IMS_SUBNET: 10.100.100.0/24
+      UE_SUBNET: 10.60.0.0/16
+      TUN_PREFIX: ueTun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      corenet:
+        ipv4_address: 10.100.200.41
+    depends_on:
+      - gnb
+
+  ue2:
+    container_name: poc-ue2
+    image: poc/ran:latest
+    build: ./ran
+    entrypoint: ["/entrypoint-ue.sh"]
+    volumes:
+      - ./config/ue-ue2.yaml:/ran/config/ue.yaml:ro
+    environment:
+      IMS_SUBNET: 10.100.100.0/24
+      UE_SUBNET: 10.60.0.0/16
+      TUN_PREFIX: ueTun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    networks:
+      corenet:
+        ipv4_address: 10.100.200.42
+    depends_on:
+      - gnb
+
+
 networks:
   corenet:
     name: poc-corenet

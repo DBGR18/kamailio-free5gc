@@ -42,14 +42,38 @@ done
 # ------------------------------------------------------------ 3. subscribers
 ./scripts/02-add-subscribers.sh
 
-# ------------------------------------------------------------------- 4. UEs
-#
-# REMOVED 2026-09-04: the UERANSIM gNB/UE containers were deleted when the PoC
-# switched to free-ran-ue. Everything above this line still works; bringing a
-# UE up again needs the free-ran-ue gNB and UE services added back to
-# docker-compose.yaml first. The old UERANSIM version of this section is in the
-# cleanup backup (B-ueransim/01-up.sh) if you want it as a reference.
-#
+# ------------------------------------------------------------- 4. RAN and UEs
+echo "[up] starting the gNB"
+docker compose up -d gnb
+
+echo "[up] starting the UEs"
+docker compose up -d --force-recreate ue1 ue2
+
+echo "[up] waiting for the UEs to get a PDU session..."
+FAILED=0
+for ue in ue1 ue2; do
+    ok=""
+    for _ in $(seq 1 90); do
+        ip=$(docker exec "poc-${ue}" cat /tmp/ue_ip 2>/dev/null || true)
+        if [ -n "${ip}" ]; then
+            echo "[up]   ${ue}: ${ip}"
+            ok=1
+            break
+        fi
+        sleep 2
+    done
+    if [ -z "${ok}" ]; then
+        echo "[up]   ${ue}: FAILED to get a PDU session"
+        echo "[up]   logs: docker logs poc-${ue}"
+        FAILED=1
+    fi
+done
+
+if [ "${FAILED}" -ne 0 ]; then
+    echo
+    echo "[up] the core is up but at least one UE did not attach."
+    exit 1
+fi
+
 echo
-echo "[up] core network + IMS are up. NO RAN/UE yet -- free-ran-ue not wired in."
-echo "[up] next: add the free-ran-ue gNB and UE services to docker-compose.yaml"
+echo "[up] ready. Both UEs have a PDU session and can reach the IMS."
