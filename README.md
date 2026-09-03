@@ -33,14 +33,6 @@ Turning it into an actual IMS means:
 
 Each step is ordered so that the one before it becomes verifiable.
 
-## Status
-
-The 5G core and the IMS proxy come up and talk to each other. The RAN and UE
-side is mid-migration from UERANSIM to
-[free-ran-ue](https://github.com/free-ran-ue/free-ran-ue), so there is no UE in
-`docker-compose.yaml` right now — `01-up.sh` brings up everything except the
-radio and stops there.
-
 ## Quick start
 
 ```bash
@@ -75,8 +67,3 @@ way are being written up under `docs/` (not tracked yet).
 | free5gc | v4.2.3 | Docker images |
 | gtp5g | master (0.10.2) | Host kernel module, builds clean on Linux 7.x |
 | Kamailio | 6.x | Built from the Debian package |
-
-free5gc's UPF enforces a gtp5g version range, and it changed between releases:
-v4.2.0 and v4.2.1 accept `0.9.5 <= v < 0.10.0`, while v4.2.2 and later widened it
-to `0.9.5 <= v < 0.11.0`. Trust `internal/forwarder/gtp5g.go` over the go-upf
-README — the two disagree.
