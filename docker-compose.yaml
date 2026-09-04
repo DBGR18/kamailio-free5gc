@@ -299,6 +299,44 @@ services:
       - gnb
 
 
+  # --------------------------------------------------------------- IMS: HSS
+  # The IMS identity source. It sits entirely on the Data Network side,
+  # alongside Kamailio -- there is no interface between it and the 5G core,
+  # and IMS authentication never reads free5gc's UDR. The two subscriber
+  # stores are kept in step by provisioning, not by a data path.
+  hss-db:
+    container_name: poc-hss-db
+    image: mongo:4.4
+    command: mongod --port 27017
+    volumes:
+      - hssdata:/data/db
+    networks:
+      dnnet:
+        aliases:
+          - hss-db
+
+  hss:
+    container_name: poc-hss
+    image: gradiant/open5gs:2.8.0
+    entrypoint: ["/hss-entrypoint.sh"]
+    environment:
+      # The image bakes in DB_URI=mongodb://mongo/open5gs, and Open5GS lets
+      # the environment win over the config file -- so hss.yaml's db_uri is
+      # ignored unless this is set too.
+      DB_URI: mongodb://hss-db/open5gs
+    volumes:
+      - ./hss/hss.yaml:/open5gs/hss.yaml:ro
+      - ./hss/hss.conf:/open5gs/hss.conf:ro
+      - ./hss/entrypoint.sh:/hss-entrypoint.sh:ro
+    networks:
+      dnnet:
+        ipv4_address: 10.100.100.20
+        aliases:
+          - hss.ims.mnc093.mcc208.3gppnetwork.org
+    depends_on:
+      - hss-db
+
+
 networks:
   corenet:
     name: poc-corenet
@@ -319,3 +357,4 @@ networks:
 
 volumes:
   dbdata:
+  hssdata:
