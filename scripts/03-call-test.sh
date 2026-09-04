@@ -73,8 +73,8 @@ register ue2 ue2 "${UE2_IP}"
 echo
 
 echo "--- registrar contents (Kamailio usrloc) ---"
-docker exec poc-kamailio kamctl ul show 2>/dev/null || \
-    docker logs poc-kamailio 2>&1 | grep '\[REG\]' | tail -4
+docker exec poc-pcscf kamctl ul show 2>/dev/null || \
+    docker logs poc-pcscf 2>&1 | grep '\[REG\]' | tail -4
 echo
 
 # --------------------------------------------------------- 3. UE2 listens
@@ -129,10 +129,10 @@ RTP_PKTS=$(sudo tcpdump -r "${CAP}" -n 2>/dev/null \
 echo "Largest same-size packet group (the RTP media stream): ${RTP_PKTS} packets"
 echo
 echo "Kamailio's view of the call:"
-docker logs poc-kamailio 2>&1 | grep -E '\[SIP\]|\[REG\]|\[LOOKUP\]' | tail -12
+docker logs poc-pcscf 2>&1 | grep -E '\[SIP\]|\[REG\]|\[LOOKUP\]' | tail -12
 echo
 
-BYE_SEEN=$(docker logs poc-kamailio 2>&1 | grep -c '\[SIP\] BYE' || true)
+BYE_SEEN=$(docker logs poc-pcscf 2>&1 | grep -c '\[SIP\] BYE' || true)
 
 if [ "${CALL_RC}" -eq 0 ] && [ "${GTPU_PKTS}" -gt 0 ] && [ "${BYE_SEEN}" -gt 0 ]; then
     echo "=============================================================="

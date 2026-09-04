@@ -28,13 +28,13 @@ services:
       dnnet:
         ipv4_address: 10.100.100.30
 
-  # ------------------------------------------------------------- the "IMS"
-  kamailio:
-    container_name: poc-kamailio
-    image: poc/kamailio:latest
-    build: ./kamailio
+  # ------------------------------------------------------------ IMS: P-CSCF
+  pcscf:
+    container_name: poc-pcscf
+    image: poc/pcscf:latest
+    build: ./pcscf
     volumes:
-      - ./kamailio/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
+      - ./pcscf/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
     environment:
       UPF_DN_IP: 10.100.100.30
       UE_SUBNET: 10.62.0.0/16

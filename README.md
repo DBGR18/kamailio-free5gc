@@ -54,7 +54,8 @@ on `master`; set `GTP5G_DIR` if yours lives elsewhere.
 |---|---|
 | `docker-compose.yaml` | The whole topology: two networks, one UPF bridging them |
 | `config/` | free5gc network function configs |
-| `kamailio/` | Kamailio image and routing config |
+| `pcscf/`, `icscf/`, `scscf/` | The three CSCF roles |
+| `hss/` | PyHSS configuration |
 | `scripts/` | Bring-up, provisioning, teardown |
 
 Design notes, the reasoning behind each decision, and the problems hit along the

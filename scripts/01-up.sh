@@ -36,12 +36,12 @@ else
 fi
 
 # ------------------------------------------------------- 2. core network + RAN
-echo "[up] building local images (kamailio, ue-sip)"
+echo "[up] building local images"
 docker compose build
 
-echo "[up] starting core network, IMS and RAN"
-docker compose up -d upf kamailio db nrf amf ausf nssf pcf smf udm udr webui \
-    pyhss-redis pyhss-hss pyhss-api pyhss-diameter
+echo "[up] starting the core network and the IMS (P/I/S-CSCF + HSS)"
+docker compose up -d upf pcscf db nrf amf ausf nssf pcf smf udm udr webui \
+    pyhss-redis pyhss-hss pyhss-api pyhss-diameter scscf icscf
 
 echo "[up] waiting for the webconsole..."
 for _ in $(seq 1 60); do

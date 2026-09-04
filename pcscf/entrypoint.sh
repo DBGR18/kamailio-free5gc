@@ -12,7 +12,7 @@ set -e
 UPF_DN_IP="${UPF_DN_IP:-10.100.100.30}"
 UE_SUBNET="${UE_SUBNET:-10.62.0.0/16}"
 
-echo "[kamailio] routing ${UE_SUBNET} via UPF at ${UPF_DN_IP}"
+echo "[pcscf] routing ${UE_SUBNET} via UPF at ${UPF_DN_IP}"
 ip route replace "${UE_SUBNET}" via "${UPF_DN_IP}"
 ip route show
 
