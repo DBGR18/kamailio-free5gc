@@ -401,6 +401,32 @@ services:
       - pyhss-diameter
 
 
+  # ------------------------------------------------------------ IMS: I-CSCF
+  # The network's front door. It holds no user state -- it asks the HSS which
+  # S-CSCF serves a user (UAR) and where a callee is registered (LIR), which
+  # are the two Cx commands the S-CSCF never sends.
+  icscf:
+    container_name: poc-icscf
+    image: poc/icscf:latest
+    build: ./icscf
+    environment:
+      UE_SUBNET: 10.62.0.0/16
+      UPF_DN_IP: 10.100.100.30
+    volumes:
+      - ./icscf/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
+      - ./icscf/icscf.xml:/etc/kamailio/icscf.xml:ro
+    cap_add:
+      - NET_ADMIN
+    networks:
+      dnnet:
+        ipv4_address: 10.100.100.22
+        aliases:
+          - icscf.ims.mnc093.mcc208.3gppnetwork.org
+    depends_on:
+      - pyhss-diameter
+      - scscf
+
+
 networks:
   corenet:
     name: poc-corenet
