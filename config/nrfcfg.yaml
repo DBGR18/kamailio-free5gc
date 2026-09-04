@@ -16,7 +16,21 @@ configuration:
     rootcert: # the local path of root CA certs
       pem: cert/nrf.pem
       key: cert/nrf.key
-    oauth: true
+    # Off, and it has to be for the AF work to function at all.
+    #
+    # With oauth on, the PCF can never tell the SMF that a policy changed --
+    # which is the last step of every N5 request and the only one that reaches
+    # the UPF. The PCF asks the NRF for a token scoped to nsmf-callback, but
+    # the SMF puts two authorization checks on that same route and demands
+    # npcf-smpolicycontrol as well. Neither scope is configurable: the PCF
+    # hardcodes what it requests and the SMF hardcodes what it requires, so
+    # nothing short of patching free5gc reconciles them.
+    #
+    # The AF still asks the NRF for a token and still presents it when one is
+    # issued; it only drops the header once the NRF tells it OAuth is off. So
+    # flipping this back to true is all it takes to re-arm the AF side, the
+    # day free5gc fixes the PCF/SMF mismatch.
+    oauth: false
   DefaultPlmnId:
     mcc: 208 # Mobile Country Code (3 digits string, digit: 0~9)
     mnc: 93 # Mobile Network Code (2 or 3 digits string, digit: 0~9)

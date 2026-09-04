@@ -41,7 +41,7 @@ docker compose build
 
 echo "[up] starting the core network and the IMS (P/I/S-CSCF + HSS)"
 docker compose up -d upf pcscf db nrf amf ausf nssf pcf smf udm udr webui \
-    pyhss-redis pyhss-hss pyhss-api pyhss-diameter scscf icscf
+    pyhss-redis pyhss-hss pyhss-api pyhss-diameter scscf icscf af
 
 echo "[up] waiting for the webconsole..."
 for _ in $(seq 1 60); do

@@ -29,6 +29,31 @@ services:
         ipv4_address: 10.100.100.30
 
   # ------------------------------------------------------------ IMS: P-CSCF
+  # The AF shim, the P-CSCF's arm into the 5G policy plane. It is the only
+  # container on both networks, and it has to be: the P-CSCF that calls it
+  # lives on the data network, while the PCF it calls lives on the core's SBI
+  # network. That is the AF's actual position -- an IMS-facing service that is
+  # inside the 5GC trust domain.
+  af:
+    container_name: poc-af
+    image: poc/af:latest
+    build: ./af
+    environment:
+      PCF_URI: http://pcf:8000
+      # The PCF only ever sees this container on the core network, so the
+      # address it is told to call back on has to be the corenet one.
+      AF_NOTIF_URI: http://10.100.200.50:8090/notify
+      AF_DNN: ims
+      NRF_URI: http://nrf.free5gc.org:8000
+      AF_CORENET_IP: 10.100.200.50
+    networks:
+      corenet:
+        ipv4_address: 10.100.200.50
+      dnnet:
+        ipv4_address: 10.100.100.40
+    depends_on:
+      - pcf
+
   pcscf:
     container_name: poc-pcscf
     image: poc/pcscf:latest

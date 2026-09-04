@@ -16,6 +16,14 @@ configuration:
     - nsmf-pdusession # Nsmf_PDUSession service
     - nsmf-event-exposure # Nsmf_EventExposure service
     - nsmf-oam # OAM service
+    # Not in free5gc's default config, and the PCF cannot work without it.
+    # When the PCF has to tell the SMF that a policy changed -- which is what
+    # every AF request over N5 ends in -- it first asks the NRF for a token
+    # scoped to nsmf-callback. The NRF grants a scope only if the target NF
+    # advertises that service, so with the default list the request is refused
+    # and the PCF gives up without logging anything: the AF sees 201 Created
+    # and nothing whatsoever reaches the SMF or the UPF.
+    - nsmf-callback # Nsmf_Callback, the service the PCF notifies policy changes on
   snssaiInfos: # the S-NSSAI (Single Network Slice Selection Assistance Information) list supported by this AMF
     - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
