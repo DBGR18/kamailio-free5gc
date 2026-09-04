@@ -1,0 +1,45 @@
+diff --git a/ue/nas.go b/ue/nas.go
+index ee70a97..e82d466 100644
+--- a/ue/nas.go
++++ b/ue/nas.go
+@@ -170,6 +170,11 @@ func buildPduSessionEstablishmentRequest(pduSessionId uint8) ([]byte, error) {
+ 			FromMs: &ie.ExtCfgOptFromMs{
+ 				DNSV4Req: true,
+ 				DNSV6Req: true,
++				// Ask the network where the P-CSCF is, instead of having it
++				// configured into the UE. This is the IMS equivalent of the
++				// DNS request on the line above: PCO container 000Ch, which
++				// the SMF answers from the DNN's own configuration.
++				P_CSCF_IPv4AddrReq: true,
+ 			},
+ 		},
+ 	}
+diff --git a/ue/ue.go b/ue/ue.go
+index 575e6af..a354c01 100644
+--- a/ue/ue.go
++++ b/ue/ue.go
+@@ -44,6 +44,7 @@ type pduSession struct {
+ 
+ type pduSessionEstablishmentAccept struct {
+ 	ueIp    string
++	pcscfIp string
+ 	qosRule []uint8
+ 	dnn     string
+ 	sst     uint8
+@@ -665,6 +666,16 @@ func (u *Ue) extractUeInformationFromNasPduSessionEstablishmentAccept(dlNasTrans
+ 		}
+ 		u.PduLog.Infof("PDU session DNN: %s", u.pduSessionEstablishmentAccept.dnn)
+ 
++		// The P-CSCF address the network chose for this DNN, carried back in
++		// the same extended PCO the request asked in. Absent unless the DNN
++		// is configured with one, so an empty value is not an error.
++		if epco := pduSessionEstablishmentAccept.ExtendedProtCfgOpts; epco != nil && epco.FromNw != nil {
++			if ip := epco.FromNw.P_CSCF_IPv4Addr; ip != nil {
++				u.pduSessionEstablishmentAccept.pcscfIp = ip.String()
++			}
++		}
++		u.PduLog.Infof("PDU session P-CSCF: %s", u.pduSessionEstablishmentAccept.pcscfIp)
++
+ 		if pduSessionEstablishmentAccept.SNSSAI != nil {
+ 			u.pduSessionEstablishmentAccept.sst = pduSessionEstablishmentAccept.SNSSAI.SST
+ 			if sd, err := hex.DecodeString(pduSessionEstablishmentAccept.SNSSAI.SD); err == nil {

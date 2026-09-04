@@ -27,8 +27,15 @@ UE_SUBNET="${UE_SUBNET:-10.62.0.0/16}"
 # prefix instead of guessing the suffix.
 TUN_PREFIX="${TUN_PREFIX:-ueTun}"
 
+# The UE's log is the only place the discovered P-CSCF address surfaces, so
+# it is teed to a file for the wait loop below to read. Process substitution
+# rather than a pipe, so $! stays free-ran-ue's own pid and the liveness check
+# further down still means something.
+UE_LOG=/tmp/ue.log
+: > "${UE_LOG}"
+
 echo "[ue] starting free-ran-ue ue with ${UE_CONFIG}"
-free-ran-ue ue -c "${UE_CONFIG}" &
+free-ran-ue ue -c "${UE_CONFIG}" > >(tee -a "${UE_LOG}") 2>&1 &
 UE_PID=$!
 
 echo "[ue] waiting for ${TUN_PREFIX}* (PDU session establishment)..."
@@ -56,6 +63,19 @@ fi
 
 echo "[ue] PDU session up: ${TUN_IF} has ${UE_IP}"
 echo "${UE_IP}" > /tmp/ue_ip
+
+# The P-CSCF address the network handed back in the PDU Session Establishment
+# Accept, in PCO container 000Ch. Nothing here configures it: the UE asked and
+# the SMF answered out of the ims DNN's own settings, which is how a real UE
+# finds its way into the IMS. Written out for the SIP client to target.
+rm -f /tmp/pcscf_ip
+PCSCF_IP=$(sed -n 's/.*PDU session P-CSCF: \([0-9][0-9.]*\).*/\1/p' "${UE_LOG}" | tail -1)
+if [ -n "${PCSCF_IP}" ]; then
+    echo "${PCSCF_IP}" > /tmp/pcscf_ip
+    echo "[ue] P-CSCF discovered via PCO: ${PCSCF_IP}"
+else
+    echo "[ue] no P-CSCF in the PCO -- is pcscf: configured on this DNN?"
+fi
 
 # Send IMS-bound traffic (SIP signalling) through the PDU session.
 ip route replace "${IMS_SUBNET}" dev "${TUN_IF}" src "${UE_IP}"

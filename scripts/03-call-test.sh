@@ -26,7 +26,6 @@ cd "${HERE}"
 source "${HERE}/scripts/lib-keys.sh"
 
 REALM="ims.mnc093.mcc208.3gppnetwork.org"
-PCSCF_IP="10.100.100.10"
 N3_BRIDGE="br-poc-core"
 CAP="/tmp/poc-n3-gtpu.pcap"
 
@@ -34,7 +33,12 @@ CAP="/tmp/poc-n3-gtpu.pcap"
 IMSI_ue1="208930000000001"
 IMSI_ue2="208930000000002"
 
-ue_ip() { docker exec "poc-$1" cat /tmp/ue_ip 2>/dev/null; }
+# "|| true" is load-bearing. Under set -e an assignment from a command
+# substitution takes the substitution's exit status, so a missing file would
+# end the script right here -- silently, before any of the checks below could
+# explain what was wrong.
+ue_ip()    { docker exec "poc-$1" cat /tmp/ue_ip 2>/dev/null || true; }
+ue_pcscf() { docker exec "poc-$1" cat /tmp/pcscf_ip 2>/dev/null || true; }
 
 UE1_IP=$(ue_ip ue1)
 UE2_IP=$(ue_ip ue2)
@@ -44,12 +48,34 @@ if [ -z "${UE1_IP}" ] || [ -z "${UE2_IP}" ]; then
     exit 1
 fi
 
+# Each UE uses the P-CSCF the network gave it, not a constant in this script.
+# That is the whole point of the PCO exchange: if discovery breaks, this test
+# has nowhere to send SIP and says so, instead of quietly falling back to an
+# address that happens to be right.
+UE1_PCSCF=$(ue_pcscf ue1)
+UE2_PCSCF=$(ue_pcscf ue2)
+if [ -z "${UE1_PCSCF}" ] || [ -z "${UE2_PCSCF}" ]; then
+    echo "[test] ERROR: a UE did not learn a P-CSCF address."
+    echo "[test] The UE asks for it in the PDU Session Establishment Request"
+    echo "[test] and the SMF answers from the ims DNN's pcscf: setting."
+    echo "[test] check: docker logs poc-ue1 | grep P-CSCF"
+    exit 1
+fi
+
+# The claim is that the UE was told, not configured. Worth asserting rather
+# than trusting, since a stray pcscf entry in the UE config would make the
+# whole exchange decorative.
+if grep -qi "pcscf" config/ue-ue1.yaml config/ue-ue2.yaml 2>/dev/null; then
+    echo "[test] ERROR: a UE config mentions a P-CSCF; discovery proves nothing."
+    exit 1
+fi
+
 echo "=============================================================="
 echo " free5gc + IMS PoC -- call test"
 echo "=============================================================="
 echo " UE1 (caller) : ${UE1_IP}   sip:${IMSI_ue1}@${REALM}"
 echo " UE2 (callee) : ${UE2_IP}   sip:${IMSI_ue2}@${REALM}"
-echo " P-CSCF       : ${PCSCF_IP}:5060  (on the Data Network, over N6)"
+echo " P-CSCF       : ${UE1_PCSCF}:5060  learned from the network, not configured"
 echo " I-CSCF       : 10.100.100.22:4060"
 echo " S-CSCF       : 10.100.100.21:6060"
 echo
@@ -75,7 +101,7 @@ trap cleanup EXIT
 # first is hoisted out in front of the keyword and the rest are left empty.
 # So the values are substituted into a per-UE copy of the scenario instead.
 register() {
-    local ue="$1" imsi="$2" ip="$3"
+    local ue="$1" imsi="$2" ip="$3" pcscf="$4"
     local tmp="/tmp/poc-${ue}-register.xml"
 
     sed -e "s|@IMPI@|${imsi}@${REALM}|g" \
@@ -97,7 +123,7 @@ register() {
         -i "${ip}" -p 5060 \
         -m 1 -r 1 -timeout 30s \
         -trace_err -error_file "/tmp/${ue}-register-err.log" \
-        "${PCSCF_IP}:5060" 2>&1 | tail -3
+        "${pcscf}:5060" 2>&1 | tail -3
 }
 
 # Every grep below is scoped to this moment onwards. The containers keep
@@ -106,10 +132,10 @@ register() {
 RUN_SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo "--- [1/5] UE1 registers with the IMS ---"
-register ue1 "${IMSI_ue1}" "${UE1_IP}"
+register ue1 "${IMSI_ue1}" "${UE1_IP}" "${UE1_PCSCF}"
 echo
 echo "--- [2/5] UE2 registers with the IMS ---"
-register ue2 "${IMSI_ue2}" "${UE2_IP}"
+register ue2 "${IMSI_ue2}" "${UE2_IP}" "${UE2_PCSCF}"
 echo
 
 echo "--- what each role recorded ---"
@@ -161,7 +187,7 @@ docker exec poc-ue1 sipp \
     -i "${UE1_IP}" -p 5060 -mp 6000 \
     -m 1 -r 1 -timeout 60s \
     -trace_err -error_file /tmp/ue1-uac-err.log \
-    "${PCSCF_IP}:5060" > /tmp/poc-uac-out.txt 2>&1
+    "${UE1_PCSCF}:5060" > /tmp/poc-uac-out.txt 2>&1
 CALL_RC=$?
 set -e
 tail -20 /tmp/poc-uac-out.txt

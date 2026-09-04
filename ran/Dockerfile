@@ -16,8 +16,15 @@ FROM golang:1.26-bookworm AS builder
 ARG FRU_VERSION=v2.5.0
 WORKDIR /src
 
+# free-ran-ue asks the network for DNS servers but not for a P-CSCF, and it
+# discards the network's half of the extended PCO entirely -- so the address
+# would have to be configured into the UE by hand. The patch adds the request
+# and keeps the answer; both fields already exist in free5gc/nas and are
+# marshalled and parsed by it, so this is about ten lines.
+COPY pcscf-discovery.patch /tmp/pcscf-discovery.patch
 RUN git clone --depth 1 --branch ${FRU_VERSION} \
       https://github.com/free-ran-ue/free-ran-ue.git . \
+ && git apply --verbose /tmp/pcscf-discovery.patch \
  && go build -trimpath -o /out/free-ran-ue main.go
 
 FROM debian:trixie-slim
