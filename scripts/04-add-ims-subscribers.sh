@@ -25,6 +25,10 @@ set -e
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${HERE}"
 
+# Key material, all derived from one OP. See the file for why OP and not OPc.
+# shellcheck source=scripts/lib-keys.sh
+source "${HERE}/scripts/lib-keys.sh"
+
 API="${PYHSS_API:-http://127.0.0.1:8080}"
 
 MCC="208"
@@ -34,10 +38,10 @@ MNC="93"
 MNC3=$(printf '%03d' "${MNC}")
 REALM="ims.mnc${MNC3}.mcc${MCC}.3gppnetwork.org"
 
-# Same key material as the 5G side; see scripts/02-add-subscribers.sh.
-K="8baf473f2f8fd09487cccbd7097c6862"
-OPC="8e27b6af0e692e750f32667a3b14605d"
-AMF_FIELD="8000"
+# Key material comes from lib-keys.sh, same source as the 5G side.
+K="${KEY_K}"
+OPC="${KEY_OPC}"
+AMF_FIELD="${KEY_AMF}"
 
 # IMSI:MSISDN -- must match SUBSCRIBERS in 02-add-subscribers.sh.
 SUBSCRIBERS=(
@@ -90,7 +94,7 @@ for entry in "${SUBSCRIBERS[@]}"; do
     auc_rc=$(curl -s -o /tmp/pyhss_auc -w '%{http_code}' -X PUT "${API}/auc/" \
         -H 'Content-Type: application/json' \
         -d "{\"ki\":\"${K}\",\"opc\":\"${OPC}\",\"amf\":\"${AMF_FIELD}\",
-             \"sqn\":35,\"imsi\":\"${imsi}\",\"algo\":\"milenage\",
+             \"sqn\":${KEY_SQN_DEC},\"imsi\":\"${imsi}\",\"algo\":\"milenage\",
              \"batch_name\":\"poc\",\"sim_vendor\":\"poc\"}")
     if [ "${auc_rc}" != "200" ] && [ "${auc_rc}" != "201" ]; then
         echo "[ims-sub]   ERROR: AUC create returned ${auc_rc}"

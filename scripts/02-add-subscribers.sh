@@ -9,6 +9,10 @@
 set -e
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Key material, all derived from one OP; see the file for why OP and not OPc.
+# shellcheck source=scripts/lib-keys.sh
+source "${HERE}/scripts/lib-keys.sh"
 WEBUI="${WEBUI:-http://127.0.0.1:5000}"
 PLMN="20893"
 # ueId:msisdn -- the MSISDN (GPSI) must be unique per subscriber, the
@@ -28,22 +32,26 @@ fi
 for entry in "${SUBSCRIBERS[@]}"; do
     ueid="${entry%%:*}"
     msisdn="${entry##*:}"
-    body=$(python3 - "${HERE}/scripts/subscriber-template.json" "${ueid}" "${PLMN}" "${msisdn}" <<'PY'
+    body=$(python3 - "${HERE}/scripts/subscriber-template.json" "${ueid}" "${PLMN}" "${msisdn}" \
+        "${KEY_K}" "${KEY_OPC}" "${KEY_AMF}" "${KEY_SQN_HEX}" <<'PY'
 import json, sys
 tpl, ueid, plmn, msisdn = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+key_k, key_opc, key_amf, key_sqn = sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
 d = json.load(open(tpl))
 d["ueId"] = ueid
 d["plmnID"] = plmn
 d["AccessAndMobilitySubscriptionData"]["gpsis"] = ["msisdn-" + msisdn]
 
-# The Postman template stores 8e27... in the milenage OP field, but the UE
-# configs declare it as OPc, so the value has to be moved to the opc field.
-# OP and OPc are different inputs to Milenage, so leaving this mismatched
-# makes authentication fail with "AUTN validation MAC mismatch".
+# The template stores its key material in the milenage OP field, but the UE
+# declares it as OPc -- different inputs to Milenage, and leaving them
+# mismatched fails with "AUTN validation MAC mismatch". Take the values from
+# lib-keys.sh instead of the template so that every component is provisioned
+# from the same OP.
 auth = d["AuthenticationSubscription"]
-opc_value = auth["milenage"]["op"]["opValue"]
-auth["opc"]["opcValue"] = opc_value
+auth["permanentKey"]["permanentKeyValue"] = key_k
+auth["opc"]["opcValue"] = key_opc
 auth["milenage"]["op"]["opValue"] = ""
+auth["authenticationManagementField"] = key_amf
 
 # SQN handling: a 3GPP sequence number splits into SEQ (high 43 bits) and
 # IND (low 5 bits), and the UE accepts a vector only when its SEQ is
@@ -53,7 +61,7 @@ auth["milenage"]["op"]["opValue"] = ""
 #   * zero is rejected too, because free5gc increments SQN by one and any
 #     value below 32 still has SEQ == 0, i.e. it never looks fresh.
 # 0x23 puts SEQ at 1 -- one step ahead of the UE -- which both sides accept.
-auth["sequenceNumber"] = "000000000023"
+auth["sequenceNumber"] = key_sqn
 # The extra QoS flow rules in the template are unrelated to this PoC and only
 # add moving parts, so drop them.
 d.pop("FlowRules", None)

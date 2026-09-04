@@ -20,7 +20,10 @@ ue:
 
   authenticationSubscription:
     encPermanentKey: "8baf473f2f8fd09487cccbd7097c6862"
-    encOpcKey: "8e27b6af0e692e750f32667a3b14605d"
+    # OPc, computed from OP cdc202d5123e20f62b6d676ac72cb318 by scripts/lib-keys.sh.
+    # SIPp needs the OP and cannot take an OPc, so OP is the source of
+    # truth and this value is derived; 01-up.sh checks the two agree.
+    encOpcKey: "604de903e29f45ef46ddbca70565fcfb"
     authenticationManagementField: "8000"
     # SEQ must sit exactly one step ahead of the UE's counter; see
     # docs/ARCHITECTURE.md for why 0 and the template default both fail.

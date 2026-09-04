@@ -15,6 +15,18 @@ set -e
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${HERE}"
 
+# ------------------------------------------------------------- 0. key check
+# The UE simulator's config carries a literal OPc that has to match what the
+# provisioning scripts compute from OP. Catch a mismatch here rather than as
+# an "AUTN validation MAC mismatch" three steps later.
+# shellcheck source=scripts/lib-keys.sh
+source "${HERE}/scripts/lib-keys.sh"
+if ! verify_ue_configs "${HERE}"; then
+    echo "[up] key material is inconsistent -- fix the UE configs and re-run"
+    exit 1
+fi
+echo "[up] key material consistent (OPc ${KEY_OPC})"
+
 # ---------------------------------------------------------- 1. kernel module
 if ! lsmod | grep -q '^gtp5g'; then
     echo "[up] gtp5g is not loaded -- running scripts/00-setup-gtp5g.sh"
