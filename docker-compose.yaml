@@ -263,6 +263,9 @@ services:
     entrypoint: ["/entrypoint-ue.sh"]
     volumes:
       - ./config/ue-ue1.yaml:/ran/config/ue.yaml:ro
+      # Mounted rather than baked in, so a scenario change only needs a
+      # container restart instead of rebuilding the whole RAN image.
+      - ./ran/sipp:/sipp:ro
     environment:
       IMS_SUBNET: 10.100.100.0/24
       UE_SUBNET: 10.62.0.0/16
@@ -284,6 +287,9 @@ services:
     entrypoint: ["/entrypoint-ue.sh"]
     volumes:
       - ./config/ue-ue2.yaml:/ran/config/ue.yaml:ro
+      # Mounted rather than baked in, so a scenario change only needs a
+      # container restart instead of rebuilding the whole RAN image.
+      - ./ran/sipp:/sipp:ro
     environment:
       IMS_SUBNET: 10.100.100.0/24
       UE_SUBNET: 10.62.0.0/16

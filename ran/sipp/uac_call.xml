@@ -1,25 +1,33 @@
 <?xml version="1.0" encoding="ISO-8859-1" ?>
 <!DOCTYPE scenario SYSTEM "sipp.dtd">
 
-<!-- Caller side: UE1 dials UE2 through Kamailio.
+<!-- Caller side: UE1 dials UE2 through the IMS.
 
-     [field0] = caller user part, [field1] = callee user part (from -inf CSV).
-     The INVITE is addressed to the callee AT THE PROXY; Kamailio resolves it
-     to the contact the callee registered with, which is an address inside
-     the UE IP pool (10.60.0.0/16) reachable only through the UPF.
+     [field0] = caller IMSI, [field1] = callee IMSI, [field2] = IMS realm
+     (from -inf CSV). The callee is addressed by its public identity,
+     sip:<IMSI>@<realm>, and NOT by user@proxy-address: the I-CSCF puts the
+     R-URI straight into the Cx LIR it sends the HSS, so anything that is not
+     a provisioned IMPU comes back "Identity not found" and the call is
+     rejected before it ever reaches an S-CSCF.
+
+     The request travels
+         UE1 -> P-CSCF -> I-CSCF -(LIR/LIA)- HSS
+                       -> S-CSCF -> P-CSCF -> UE2
+     and the P-CSCF appears twice because the Path it inserted at
+     registration brings the terminating leg back through it.
 
      rrs="true" on the 200 stores the Record-Route set so that ACK and BYE
-     carry the [routes] header and travel back through the proxy. -->
+     carry the [routes] header and follow that same chain back. -->
 <scenario name="UE outgoing call">
 
   <send retrans="500">
     <![CDATA[
 
-      INVITE sip:[field1]@[remote_ip] SIP/2.0
+      INVITE sip:[field1]@[field2] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       Max-Forwards: 70
-      From: <sip:[field0]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
-      To: <sip:[field1]@[remote_ip]>
+      From: <sip:[field0]@[field2]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[field1]@[field2]>
       Call-ID: [call_id]
       CSeq: 1 INVITE
       Contact: <sip:[field0]@[local_ip]:[local_port];transport=[transport]>
@@ -54,8 +62,8 @@
       ACK [next_url] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       Max-Forwards: 70
-      From: <sip:[field0]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
-      To: <sip:[field1]@[remote_ip]>[peer_tag_param]
+      From: <sip:[field0]@[field2]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[field1]@[field2]>[peer_tag_param]
       Call-ID: [call_id]
       CSeq: 1 ACK
       [routes]
@@ -82,8 +90,8 @@
       BYE [next_url] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       Max-Forwards: 70
-      From: <sip:[field0]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
-      To: <sip:[field1]@[remote_ip]>[peer_tag_param]
+      From: <sip:[field0]@[field2]>;tag=[pid]SIPpTag00[call_number]
+      To: <sip:[field1]@[field2]>[peer_tag_param]
       Call-ID: [call_id]
       CSeq: 2 BYE
       [routes]
