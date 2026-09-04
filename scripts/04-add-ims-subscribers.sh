@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Provision the IMS subscribers into the HSS.
+# Provision the IMS subscribers into PyHSS.
 #
 # This is the counterpart to 02-add-subscribers.sh, which fills free5gc's UDR.
 # The two stores hold different data and there is no interface between them:
@@ -16,10 +16,16 @@
 # Both sides are therefore generated from the same IMSI list below, and the
 # derivation is done here in code rather than written out by hand -- that is
 # what makes drift impossible rather than merely unlikely.
+#
+# PyHSS splits the subscriber across two resources: AUC holds the key
+# material, IMS_SUBSCRIBER holds the identities and points back at the AUC
+# entry by IMSI.
 set -e
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${HERE}"
+
+API="${PYHSS_API:-http://127.0.0.1:8080}"
 
 MCC="208"
 MNC="93"
@@ -39,12 +45,33 @@ SUBSCRIBERS=(
     "208930000000002:0900000002"
 )
 
-echo "[ims-sub] waiting for the HSS database..."
-for _ in $(seq 1 30); do
-    if docker exec poc-hss-db mongo --quiet --eval 'db.runCommand({ping:1}).ok' >/dev/null 2>&1; then
+echo "[ims-sub] waiting for the PyHSS API at ${API}"
+for _ in $(seq 1 60); do
+    if curl -sf -o /dev/null "${API}/oam/ping" 2>/dev/null; then
         break
     fi
     sleep 2
+done
+
+if ! curl -sf -o /dev/null "${API}/oam/ping" 2>/dev/null; then
+    echo "[ims-sub] ERROR: the PyHSS API never came up"
+    echo "[ims-sub] check: docker logs poc-pyhss-api"
+    exit 1
+fi
+
+# Remove anything left from a previous run so this script is re-runnable.
+for res in ims_subscriber auc; do
+    ids=$(curl -sf "${API}/${res}/list" 2>/dev/null \
+        | python3 -c "
+import sys, json
+try:
+    for row in json.load(sys.stdin):
+        print(row.get('${res}_id'))
+except Exception:
+    pass" 2>/dev/null || true)
+    for id in ${ids}; do
+        [ -n "${id}" ] && curl -sf -o /dev/null -X DELETE "${API}/${res}/${id}" 2>/dev/null || true
+    done
 done
 
 for entry in "${SUBSCRIBERS[@]}"; do
@@ -57,56 +84,39 @@ for entry in "${SUBSCRIBERS[@]}"; do
     echo "[ims-sub]   IMPI ${impi}"
     echo "[ims-sub]   IMPU ${impu}"
 
-    docker exec -i poc-hss-db mongo --quiet open5gs >/dev/null <<EOF
-db.subscribers.deleteOne({ imsi: "${imsi}" });
-db.subscribers.insertOne({
-  imsi: "${imsi}",
-  msisdn: [ "${msisdn}" ],
-  imeisv: [],
-  mme_host: [],
-  mme_realm: [],
-  purge_flag: [],
-  security: {
-    k:   "${K}",
-    opc: "${OPC}",
-    amf: "${AMF_FIELD}",
-    // Start one step ahead of the UE's counter, same reasoning as the 5G
-    // side: free5gc/Open5GS increment SQN by 1, and any value under 32
-    // leaves SEQ at 0, which the UE reads as "not fresh".
-    sqn: NumberLong(35)
-  },
-  ambr: {
-    downlink: { value: NumberInt(1), unit: NumberInt(3) },
-    uplink:   { value: NumberInt(1), unit: NumberInt(3) }
-  },
-  // The IMS APN. Its name matches the 5G side's ims DNN so that a reader
-  // does not have to hold two vocabularies in their head at once.
-  slice: [{
-    sst: NumberInt(1),
-    default_indicator: true,
-    session: [{
-      name: "ims",
-      type: NumberInt(3),
-      qos: { index: NumberInt(5), arp: {
-        priority_level: NumberInt(1),
-        pre_emption_capability: NumberInt(1),
-        pre_emption_vulnerability: NumberInt(1) } },
-      ambr: {
-        downlink: { value: NumberInt(10), unit: NumberInt(2) },
-        uplink:   { value: NumberInt(10), unit: NumberInt(2) }
-      }
-    }]
-  }],
-  access_restriction_data: NumberInt(32),
-  subscriber_status: NumberInt(0),
-  network_access_mode: NumberInt(0),
-  subscribed_rau_tau_timer: NumberInt(12),
-  __v: NumberInt(0)
-});
-EOF
+    # 1. Key material. SQN starts one step ahead of the UE's counter, same
+    #    reasoning as the 5G side: any value under 32 leaves SEQ at 0, which
+    #    the UE reads as "not fresh".
+    auc_rc=$(curl -s -o /tmp/pyhss_auc -w '%{http_code}' -X PUT "${API}/auc/" \
+        -H 'Content-Type: application/json' \
+        -d "{\"ki\":\"${K}\",\"opc\":\"${OPC}\",\"amf\":\"${AMF_FIELD}\",
+             \"sqn\":35,\"imsi\":\"${imsi}\",\"algo\":\"milenage\",
+             \"batch_name\":\"poc\",\"sim_vendor\":\"poc\"}")
+    if [ "${auc_rc}" != "200" ] && [ "${auc_rc}" != "201" ]; then
+        echo "[ims-sub]   ERROR: AUC create returned ${auc_rc}"
+        cat /tmp/pyhss_auc; echo
+        exit 1
+    fi
+
+    # 2. IMS identities. msisdn_list is what the HSS matches an incoming
+    #    IMPU against, so the SIP URI the UE registers with has to be in it.
+    ims_rc=$(curl -s -o /tmp/pyhss_ims -w '%{http_code}' -X PUT "${API}/ims_subscriber/" \
+        -H 'Content-Type: application/json' \
+        -d "{\"imsi\":\"${imsi}\",\"msisdn\":\"${msisdn}\",
+             \"msisdn_list\":\"[\\\"${msisdn}\\\"]\",
+             \"scscf_realm\":\"${REALM}\",
+             \"pcscf_realm\":\"${REALM}\"}")
+    if [ "${ims_rc}" != "200" ] && [ "${ims_rc}" != "201" ]; then
+        echo "[ims-sub]   ERROR: IMS subscriber create returned ${ims_rc}"
+        cat /tmp/pyhss_ims; echo
+        exit 1
+    fi
 done
 
 echo
 echo "[ims-sub] subscribers now in the HSS:"
-docker exec poc-hss-db mongo --quiet open5gs --eval \
-    'db.subscribers.find({}, {imsi:1, msisdn:1, _id:0}).forEach(function(d){ print("  " + d.imsi + "  msisdn=" + d.msisdn); })'
+curl -sf "${API}/ims_subscriber/list" | python3 -c "
+import sys, json
+for row in json.load(sys.stdin):
+    print('  imsi=%s  msisdn=%s' % (row.get('imsi'), row.get('msisdn')))
+"

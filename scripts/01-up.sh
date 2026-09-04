@@ -28,7 +28,8 @@ echo "[up] building local images (kamailio, ue-sip)"
 docker compose build
 
 echo "[up] starting core network, IMS and RAN"
-docker compose up -d upf kamailio db nrf amf ausf nssf pcf smf udm udr webui hss-db hss
+docker compose up -d upf kamailio db nrf amf ausf nssf pcf smf udm udr webui \
+    pyhss-redis pyhss-hss pyhss-api pyhss-diameter
 
 echo "[up] waiting for the webconsole..."
 for _ in $(seq 1 60); do

@@ -300,41 +300,79 @@ services:
 
 
   # --------------------------------------------------------------- IMS: HSS
-  # The IMS identity source. It sits entirely on the Data Network side,
-  # alongside Kamailio -- there is no interface between it and the 5G core,
-  # and IMS authentication never reads free5gc's UDR. The two subscriber
-  # stores are kept in step by provisioning, not by a data path.
-  hss-db:
-    container_name: poc-hss-db
-    image: mongo:4.4
-    command: mongod --port 27017
+  # PyHSS. Three roles out of one image plus Redis; the database is SQLite on
+  # a shared volume, so there is no database container. Everything lives on
+  # the Data Network side with Kamailio -- the HSS has no interface to the 5G
+  # core, so the UPF stays the only bridge between the two networks.
+  pyhss-redis:
+    container_name: poc-pyhss-redis
+    image: redis:7.0-alpine
+    command: ["redis-server", "--appendonly", "yes"]
     volumes:
-      - hssdata:/data/db
+      - pyhss-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     networks:
       dnnet:
         aliases:
-          - hss-db
+          - pyhss-redis
 
-  hss:
-    container_name: poc-hss
-    image: gradiant/open5gs:2.8.0
-    entrypoint: ["/hss-entrypoint.sh"]
+  # The subscriber logic and the SQLite store.
+  pyhss-hss:
+    container_name: poc-pyhss-hss
+    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest
+    env_file: ./hss/pyhss.env
     environment:
-      # The image bakes in DB_URI=mongodb://mongo/open5gs, and Open5GS lets
-      # the environment win over the config file -- so hss.yaml's db_uri is
-      # ignored unless this is set too.
-      DB_URI: mongodb://hss-db/open5gs
+      CONTAINER_ROLE: hss
     volumes:
-      - ./hss/hss.yaml:/open5gs/hss.yaml:ro
-      - ./hss/hss.conf:/open5gs/hss.conf:ro
-      - ./hss/entrypoint.sh:/hss-entrypoint.sh:ro
+      - pyhss-db:/var/lib/pyhss
+    networks:
+      - dnnet
+    depends_on:
+      pyhss-redis:
+        condition: service_healthy
+
+  # The provisioning REST API. 04-add-ims-subscribers.sh talks to this.
+  pyhss-api:
+    container_name: poc-pyhss-api
+    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest
+    env_file: ./hss/pyhss.env
+    environment:
+      CONTAINER_ROLE: api
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - pyhss-db:/var/lib/pyhss
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/oam/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - dnnet
+    depends_on:
+      - pyhss-hss
+
+  # The Cx endpoint: this is what the I-CSCF and S-CSCF will connect to.
+  pyhss-diameter:
+    container_name: poc-pyhss-diameter
+    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest
+    env_file: ./hss/pyhss.env
+    environment:
+      CONTAINER_ROLE: diameter
+    volumes:
+      - pyhss-db:/var/lib/pyhss
     networks:
       dnnet:
         ipv4_address: 10.100.100.20
         aliases:
           - hss.ims.mnc093.mcc208.3gppnetwork.org
     depends_on:
-      - hss-db
+      pyhss-api:
+        condition: service_healthy
 
 
 networks:
@@ -357,4 +395,5 @@ networks:
 
 volumes:
   dbdata:
-  hssdata:
+  pyhss-db:
+  pyhss-redis:
