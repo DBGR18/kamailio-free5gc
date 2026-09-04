@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  C Diameter Peer configuration for the S-CSCF.
+
+  This is the Cx transport: cdp opens the Diameter connection to the HSS and
+  ims_auth / ims_registrar_scscf issue MAR and SAR over it.
+
+  Three names have to agree exactly with what PyHSS is configured with in
+  hss/pyhss.env, or the CER/CEA handshake fails before any Cx command is ever
+  sent:
+
+    FQDN        this peer's Diameter identity. PyHSS returns it to the
+                I-CSCF as the Server-Name, so it must equal HSS_SCSCF_POOL.
+    Realm       must equal HSS_ORIGIN_REALM.
+    Peer FQDN   must equal HSS_ORIGIN_HOST.
+-->
+<DiameterPeer
+	FQDN="scscf.ims.mnc093.mcc208.3gppnetwork.org"
+	Realm="ims.mnc093.mcc208.3gppnetwork.org"
+	Vendor_Id="10415"
+	Product_Name="CDiameterPeer"
+	AcceptUnknownPeers="1"
+	DropUnknownOnDisconnect="1"
+	Tc="30"
+	Workers="4"
+	QueueLength="32"
+	TransactionTimeout="5"
+	SessionsHashSize="128"
+	DefaultAuthSessionTimeout="3600"
+	MaxAuthSessionTimeout="3600"
+>
+	<!-- PyHSS, on the Data Network beside Kamailio. -->
+	<Peer FQDN="hss.ims.mnc093.mcc208.3gppnetwork.org" Realm="ims.mnc093.mcc208.3gppnetwork.org" port="3868"/>
+
+	<!-- Where this peer listens for incoming Diameter connections. -->
+	<Acceptor port="3870" bind="0.0.0.0"/>
+
+	<!-- Application 16777216 is 3GPP Cx/Dx. The other vendor IDs are the
+	     same application as published by other bodies; harmless to offer and
+	     they save a round of debugging if the far end announces one. -->
+	<Auth id="16777216" vendor="10415"/><!-- 3GPP Cx -->
+	<Auth id="16777216" vendor="4491"/><!-- CableLabs Cx -->
+	<Auth id="16777216" vendor="13019"/><!-- ETSI/TISPAN Cx -->
+	<Auth id="16777216" vendor="0"/>
+
+	<SupportedVendor vendor="10415"/>
+
+	<DefaultRoute FQDN="hss.ims.mnc093.mcc208.3gppnetwork.org" metric="10"/>
+</DiameterPeer>

@@ -375,6 +375,32 @@ services:
         condition: service_healthy
 
 
+  # ------------------------------------------------------------ IMS: S-CSCF
+  # The first CSCF role split out of the single proxy. It is the only one
+  # that talks to the HSS, so splitting it first puts the Cx interface built
+  # in the previous step to work immediately.
+  scscf:
+    container_name: poc-scscf
+    image: poc/scscf:latest
+    build: ./scscf
+    environment:
+      UE_SUBNET: 10.62.0.0/16
+      UPF_DN_IP: 10.100.100.30
+    volumes:
+      - ./scscf/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
+      - ./scscf/scscf.xml:/etc/kamailio/scscf.xml:ro
+      - ./scscf/CxDataType_Rel7.xsd:/etc/kamailio/CxDataType_Rel7.xsd:ro
+    cap_add:
+      - NET_ADMIN
+    networks:
+      dnnet:
+        ipv4_address: 10.100.100.21
+        aliases:
+          - scscf.ims.mnc093.mcc208.3gppnetwork.org
+    depends_on:
+      - pyhss-diameter
+
+
 networks:
   corenet:
     name: poc-corenet
