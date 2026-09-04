@@ -37,7 +37,7 @@ services:
       - ./kamailio/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
     environment:
       UPF_DN_IP: 10.100.100.30
-      UE_SUBNET: 10.60.0.0/16
+      UE_SUBNET: 10.62.0.0/16
     cap_add:
       - NET_ADMIN
     networks:
@@ -265,7 +265,7 @@ services:
       - ./config/ue-ue1.yaml:/ran/config/ue.yaml:ro
     environment:
       IMS_SUBNET: 10.100.100.0/24
-      UE_SUBNET: 10.60.0.0/16
+      UE_SUBNET: 10.62.0.0/16
       TUN_PREFIX: ueTun
     cap_add:
       - NET_ADMIN
@@ -286,7 +286,7 @@ services:
       - ./config/ue-ue2.yaml:/ran/config/ue.yaml:ro
     environment:
       IMS_SUBNET: 10.100.100.0/24
-      UE_SUBNET: 10.60.0.0/16
+      UE_SUBNET: 10.62.0.0/16
       TUN_PREFIX: ueTun
     cap_add:
       - NET_ADMIN

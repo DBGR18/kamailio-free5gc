@@ -105,6 +105,32 @@
             },
             "priorityLevel": 8
           }
+        },
+        "ims": {
+          "sscModes": {
+            "defaultSscMode": "SSC_MODE_1",
+            "allowedSscModes": [
+              "SSC_MODE_2",
+              "SSC_MODE_3"
+            ]
+          },
+          "pduSessionTypes": {
+            "defaultSessionType": "IPV4",
+            "allowedSessionTypes": [
+              "IPV4"
+            ]
+          },
+          "sessionAmbr": {
+            "uplink": "10 Mbps",
+            "downlink": "10 Mbps"
+          },
+          "5gQosProfile": {
+            "5qi": 5,
+            "arp": {
+              "priorityLevel": 1
+            },
+            "priorityLevel": 1
+          }
         }
       }
     },
@@ -165,6 +191,32 @@
             },
             "priorityLevel": 8
           }
+        },
+        "ims": {
+          "sscModes": {
+            "defaultSscMode": "SSC_MODE_1",
+            "allowedSscModes": [
+              "SSC_MODE_2",
+              "SSC_MODE_3"
+            ]
+          },
+          "pduSessionTypes": {
+            "defaultSessionType": "IPV4",
+            "allowedSessionTypes": [
+              "IPV4"
+            ]
+          },
+          "sessionAmbr": {
+            "uplink": "10 Mbps",
+            "downlink": "10 Mbps"
+          },
+          "5gQosProfile": {
+            "5qi": 5,
+            "arp": {
+              "priorityLevel": 1
+            },
+            "priorityLevel": 1
+          }
         }
       }
     }
@@ -178,6 +230,9 @@
           },
           {
             "dnn": "internet2"
+          },
+          {
+            "dnn": "ims"
           }
         ]
       },
@@ -188,6 +243,9 @@
           },
           {
             "dnn": "internet2"
+          },
+          {
+            "dnn": "ims"
           }
         ]
       }
@@ -211,6 +269,9 @@
           },
           "internet2": {
             "dnn": "internet2"
+          },
+          "ims": {
+            "dnn": "ims"
           }
         }
       },
@@ -225,6 +286,9 @@
           },
           "internet2": {
             "dnn": "internet2"
+          },
+          "ims": {
+            "dnn": "ims"
           }
         }
       }

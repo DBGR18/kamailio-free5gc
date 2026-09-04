@@ -19,7 +19,7 @@ set -e
 
 UE_CONFIG="${UE_CONFIG:-/ran/config/ue.yaml}"
 IMS_SUBNET="${IMS_SUBNET:-10.100.100.0/24}"
-UE_SUBNET="${UE_SUBNET:-10.60.0.0/16}"
+UE_SUBNET="${UE_SUBNET:-10.62.0.0/16}"
 
 # ueTunnelDevice in the config is a PREFIX, not the final name: free-ran-ue
 # appends a per-UE index so that "-n" can start several UEs in one process.

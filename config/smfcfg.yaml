@@ -25,6 +25,19 @@ configuration:
           dns: # the IP address of DNS
             ipv4: 8.8.8.8
             ipv6: 2001:4860:4860::8888
+        # The IMS data network. Kept separate from "internet" so that SIP and
+        # media ride their own PDU session, which is what a real VoNR
+        # deployment does.
+        - dnn: ims
+          dns:
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+          # Handed to the UE in the PDU Session Establishment Accept as an
+          # ePCO container (TS 24.008 ID 0x000C), so the UE can discover the
+          # P-CSCF instead of having it hardcoded. free5gc has supported this
+          # since SMF v1.1.0; whether the UE asks for it is up to the UE.
+          pcscf:
+            ipv4: 10.100.100.10
     - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
         sd: 112233 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -60,6 +73,13 @@ configuration:
                   - cidr: 10.60.0.0/16
                 staticPools:
                   - cidr: 10.60.100.0/24
+              # A separate pool for IMS, so a packet's source address alone
+              # says which data network it came from.
+              - dnn: ims
+                pools:
+                  - cidr: 10.62.0.0/16
+                staticPools:
+                  - cidr: 10.62.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
               sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 112233 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -75,6 +95,7 @@ configuration:
               - 10.100.200.30
             networkInstances: # Data Network Name (DNN)
               - internet
+              - ims
     links: # the topology graph of userplane, A and B represent the two nodes of each link
       - A: gNB1
         B: UPF

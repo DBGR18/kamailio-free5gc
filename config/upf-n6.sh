@@ -6,7 +6,7 @@
 #   corenet (10.100.200.0/24) -- N3 towards the gNB, N4 towards the SMF
 #   dnnet   (10.100.100.0/24) -- N6 towards the Data Network (where the IMS lives)
 #
-# UE traffic (10.60.0.0/16) must reach Kamailio with its ORIGINAL source IP,
+# UE traffic (the ims DNN pool) must reach Kamailio with its ORIGINAL source IP,
 # otherwise both UEs would appear to the SIP proxy as the same NAT address and
 # SIP routing would need NAT helpers. So we deliberately do NOT masquerade
 # towards the DN; we only masquerade what leaves through the core network

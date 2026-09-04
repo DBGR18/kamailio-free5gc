@@ -38,7 +38,7 @@ ue:
     nea3: false
 
   pduSession:
-    dnn: "internet"
+    dnn: "ims"
     snssai:
       sst: "1"
       sd: "010203"
