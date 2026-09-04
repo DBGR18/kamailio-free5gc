@@ -63,6 +63,7 @@ sleep 2
 
 cleanup() {
     sudo kill "${TCPDUMP_PID}" 2>/dev/null || true
+    [ -n "${QOS_SAMPLER:-}" ] && kill "${QOS_SAMPLER}" 2>/dev/null
     docker exec poc-ue2 pkill sipp 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -102,7 +103,7 @@ register() {
 # Every grep below is scoped to this moment onwards. The containers keep
 # their logs across runs, so an unscoped count would report the whole history
 # of the environment as if it were evidence from this call.
-RUN_SINCE=$(date -u +%Y-%m-%dT%H:%M:%S)
+RUN_SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo "--- [1/5] UE1 registers with the IMS ---"
 register ue1 "${IMSI_ue1}" "${UE1_IP}"
@@ -117,6 +118,26 @@ docker logs --since "${RUN_SINCE}" poc-scscf 2>&1 | grep -E 'authenticated|is re
 echo
 
 # --------------------------------------------------------- 3. UE2 listens
+# The QoS rules only exist while the call is up, and the BYE at the end of
+# this script takes them away again -- so they have to be sampled from the
+# kernel while sipp is still talking. Optional: without the reader this test
+# still checks everything else.
+QOS_DIR=/tmp/poc-qos-samples
+source "${HERE}/scripts/lib-gtp5g.sh"
+UPF_PID=$(docker inspect -f '{{.State.Pid}}' poc-upf 2>/dev/null || true)
+QOS_SAMPLER=""
+if ensure_gtp5g_reader && [ -n "${UPF_PID}" ]; then
+    rm -rf "${QOS_DIR}"; mkdir -p "${QOS_DIR}"
+    (
+        for i in $(seq 1 60); do
+            sudo nsenter -t "${UPF_PID}" -n "${TUNNEL_BIN}" list pdr \
+                > "${QOS_DIR}/${i}.json" 2>/dev/null || true
+            sleep 0.5
+        done
+    ) &
+    QOS_SAMPLER=$!
+fi
+
 echo "--- [3/5] UE2 waits for an incoming call ---"
 docker exec -d poc-ue2 sipp \
     -sf /sipp/uas_answer.xml \
@@ -175,6 +196,62 @@ printf "  SAR/SAA (S-CSCF, register as serving + profile) : %s\n" "${SAR}"
 printf "  LIR/LIA (I-CSCF, where is the callee)           : %s\n" "${LIR}"
 echo
 
+echo "== the P-CSCF reserved QoS for the media, as an AF over N5 =="
+role_log pcscf | grep -E 'AF: reserving|AF: released' | sed 's/^/  /'
+if [ -n "${QOS_SAMPLER}" ]; then
+    kill "${QOS_SAMPLER}" 2>/dev/null || true
+    QOS_VERDICT=$(UE1="${UE1_IP}" UE2="${UE2_IP}" QOS_DIR="${QOS_DIR}" python3 <<'QOSPY'
+import glob, json, os
+
+ue1, ue2 = os.environ["UE1"], os.environ["UE2"]
+
+def ports(v):
+    out = []
+    for r in v or []:
+        out.extend(r if isinstance(r, list) else [r])
+    return out
+
+def media(fd):
+    if not fd or fd.get("Proto") != 17:
+        return False
+    src = (fd.get("Src") or {}).get("IP")
+    dst = (fd.get("Dst") or {}).get("IP")
+    return {src, dst} == {ue1, ue2} and 6000 in ports(fd.get("SrcPorts"))
+
+best = []
+for path in sorted(glob.glob(os.path.join(os.environ["QOS_DIR"], "*.json"))):
+    try:
+        with open(path) as fh:
+            pdrs = json.load(fh) or []
+    except Exception:
+        continue
+    hit = [p for p in pdrs
+           if media(((p.get("PDI") or {}).get("SDF") or {}).get("FD"))]
+    if len(hit) > len(best):
+        best = hit
+
+if not best:
+    print("NONE  no dedicated PDR for the media flow was ever installed")
+else:
+    lines = ["%d dedicated PDRs were installed while the call was up:" % len(best)]
+    for p in sorted(best, key=lambda x: x.get("ID")):
+        fd = ((p.get("PDI") or {}).get("SDF") or {}).get("FD")
+        lines.append("    PDR %-3s session of %-10s  %s:%s -> %s:%s  precedence %s  QER %s"
+                     % (p.get("ID"), (p.get("PDI") or {}).get("UEAddr"),
+                        (fd.get("Src") or {}).get("IP"), ports(fd.get("SrcPorts"))[0],
+                        (fd.get("Dst") or {}).get("IP"), ports(fd.get("DstPorts"))[0],
+                        p.get("Precedence"), p.get("QERID")))
+    print("OK  " + "\\n".join(lines))
+QOSPY
+)
+    printf '  %b\n' "${QOS_VERDICT#* }"
+    QOS_OK="${QOS_VERDICT%% *}"
+else
+    echo "  (skipped: no gogtp5g-tunnel and no Go toolchain to build one)"
+    QOS_OK="SKIP"
+fi
+echo
+
 echo "== it all travelled over the 5G user plane =="
 GTPU_PKTS=$(sudo tcpdump -r "${CAP}" 2>/dev/null | wc -l)
 echo "  GTP-U packets captured on N3: ${GTPU_PKTS}"
@@ -193,6 +270,10 @@ echo "  Largest same-size packet group (the RTP media stream): ${RTP_PKTS} packe
 echo
 
 BYE_SEEN=$(docker logs --since "${RUN_SINCE}" poc-pcscf 2>&1 | grep -c 'BYE' || true)
+
+if [ "${QOS_OK}" = "NONE" ]; then
+    CALL_RC=1
+fi
 
 if [ "${CALL_RC}" -eq 0 ] && [ "${GTPU_PKTS}" -gt 0 ] \
    && [ "${BYE_SEEN}" -gt 0 ] && [ "${LIR}" -gt 0 ]; then

@@ -25,29 +25,18 @@ UE_PORT=6000
 PEER_PORT=6000
 BW="64 Kbps"
 
-# gtp5g keeps its rules in the kernel, reachable only over its own generic
-# netlink family. This is free5gc's own tool for reading them.
-TUNNEL_BIN="${TUNNEL_BIN:-/tmp/gogtp5g-tunnel}"
-if [ ! -x "${TUNNEL_BIN}" ]; then
-    echo "[qos] building gogtp5g-tunnel (reads gtp5g's rules from the kernel)"
-    GOBIN="$(dirname "${TUNNEL_BIN}")" go install \
-        github.com/free5gc/go-gtp5gnl/cmd/gogtp5g-tunnel@latest 2>/dev/null || {
-        echo "[qos] ERROR: could not build gogtp5g-tunnel."
-        echo "[qos] Set TUNNEL_BIN to an existing copy and re-run."
-        exit 1
-    }
+source "${HERE}/scripts/lib-gtp5g.sh"
+if ! ensure_gtp5g_reader; then
+    echo "[qos] ERROR: no gogtp5g-tunnel, and it could not be built."
+    echo "[qos] Set TUNNEL_BIN to an existing copy and re-run."
+    exit 1
 fi
-
-UPF_PID=$(docker inspect -f '{{.State.Pid}}' poc-upf 2>/dev/null || true)
-if [ -z "${UPF_PID}" ]; then
+if ! docker inspect -f '{{.State.Pid}}' poc-upf >/dev/null 2>&1; then
     echo "[qos] ERROR: poc-upf is not running. Run ./scripts/01-up.sh first."
     exit 1
 fi
 
-# The gtp5g device lives in the UPF container's network namespace, so the
-# tool has to be run inside it -- from the host it reports nothing at all,
-# which looks exactly like "no rules installed".
-rules() { sudo nsenter -t "${UPF_PID}" -n "${TUNNEL_BIN}" list "$1" 2>/dev/null; }
+rules() { gtp5g_rules "$1"; }
 
 UE1_IP=$(docker exec poc-ue1 cat /tmp/ue_ip 2>/dev/null || true)
 UE2_IP=$(docker exec poc-ue2 cat /tmp/ue_ip 2>/dev/null || true)

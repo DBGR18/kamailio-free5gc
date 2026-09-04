@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -99,6 +100,52 @@ type callRequest struct {
 	PeerPort int    `json:"peerPort"`
 	BwUl     string `json:"bwUl"`
 	BwDl     string `json:"bwDl"`
+
+	// The P-CSCF sends the negotiated SDP instead of the four fields above,
+	// because picking the addresses apart is text work that the kamailio
+	// config is a bad place for: its re.subst is a POSIX substitution whose
+	// "." stops at a newline, so it cannot reach across SDP lines, and on a
+	// failed match it returns the subject unchanged -- which looks like a
+	// successful extraction of the whole body.
+	//
+	// Both are base64 so that a body full of CRLFs survives being a JSON
+	// string without any escaping to get wrong.
+	Dir       string `json:"dir"`
+	OfferSdp  string `json:"offerSdp"`
+	AnswerSdp string `json:"answerSdp"`
+}
+
+// sdpEndpoint is the address and port one side of an offer/answer published.
+type sdpEndpoint struct {
+	Addr string
+	Port int
+}
+
+// parseSdp pulls the connection address and the audio port out of an SDP.
+// Only what this AF needs: one audio stream, IPv4.
+func parseSdp(b64 string) (sdpEndpoint, error) {
+	var ep sdpEndpoint
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(b64))
+	if err != nil {
+		return ep, fmt.Errorf("sdp is not valid base64: %w", err)
+	}
+	for _, line := range strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n") {
+		f := strings.Fields(line)
+		switch {
+		case strings.HasPrefix(line, "c=") && len(f) >= 3:
+			// c=IN IP4 10.62.0.1
+			ep.Addr = f[2]
+		case strings.HasPrefix(line, "m=audio") && len(f) >= 2:
+			// m=audio 6000 RTP/AVP 8
+			if port, cErr := strconv.Atoi(f[1]); cErr == nil {
+				ep.Port = port
+			}
+		}
+	}
+	if ep.Addr == "" || ep.Port == 0 {
+		return ep, fmt.Errorf("no IPv4 audio stream in the sdp")
+	}
+	return ep, nil
 }
 
 type server struct {
@@ -233,6 +280,28 @@ func (s *server) handleCall(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request body: "+err.Error(), http.StatusBadRequest)
 		return
+	}
+	if req.OfferSdp != "" && req.AnswerSdp != "" {
+		offer, oErr := parseSdp(req.OfferSdp)
+		answer, aErr := parseSdp(req.AnswerSdp)
+		if oErr != nil || aErr != nil {
+			http.Error(w, fmt.Sprintf("offer: %v; answer: %v", oErr, aErr), http.StatusBadRequest)
+			return
+		}
+		// Which half of the offer/answer belongs to the UE this leg serves
+		// is the one thing the AF cannot work out for itself.
+		near, far := offer, answer
+		if req.Dir == "term" {
+			near, far = answer, offer
+		}
+		req.UePort = near.Port
+		req.PeerAddr, req.PeerPort = far.Addr, far.Port
+		// UeAddr stays whatever the P-CSCF said: that is the address of the
+		// PDU session, and the PCF binds the app session on it. The SDP is
+		// the UE's own claim about itself and is not authority for that.
+		if req.UeAddr == "" {
+			req.UeAddr = near.Addr
+		}
 	}
 	if req.CallID == "" || req.UeAddr == "" || req.PeerAddr == "" {
 		http.Error(w, "callId, ueAddr and peerAddr are required", http.StatusBadRequest)

@@ -13,6 +13,8 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       kamailio \
       kamailio-ims-modules \
+      # http_client, to reach the AF shim.
+      kamailio-utils-modules \
       iproute2 \
       iputils-ping \
       tcpdump \
