@@ -58,8 +58,9 @@ on `master`; set `GTP5G_DIR` if yours lives elsewhere.
 | `hss/` | PyHSS configuration |
 | `scripts/` | Bring-up, provisioning, teardown |
 
-Design notes, the reasoning behind each decision, and the problems hit along the
-way are being written up under `docs/` (not tracked yet).
+`docs/` explains the architecture and the concepts behind it: how the two halves
+connect, how a subscriber exists in both, what happens during registration and a
+call, and how a SIP session becomes a QoS rule in the user plane.
 
 ## Versions
 

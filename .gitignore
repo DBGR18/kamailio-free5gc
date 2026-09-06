@@ -2,9 +2,6 @@
 # free5gc regenerates what it needs; see the free5gc docs for cert generation.
 cert/
 
-# Design notes, still being written. Will be tracked once they settle.
-docs/
-
 # Local editor / OS noise
 *.swp
 *~
