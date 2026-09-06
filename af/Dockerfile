@@ -8,7 +8,7 @@
 #
 # This service bridges exactly that gap and nothing else: plain HTTP/1.1 on the
 # side kamailio calls, h2c on the side that calls the PCF.
-FROM golang:alpine AS builder
+FROM golang:1.26-alpine AS builder
 WORKDIR /src
 COPY go.mod ./
 RUN go mod download golang.org/x/net || true

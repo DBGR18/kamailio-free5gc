@@ -162,13 +162,32 @@ Two web interfaces are published on the loopback address only:
 
 ## Versions
 
-| Component | Version |
+Pinned in the repository:
+
+| Component | Version | Pinned by |
+|---|---|---|
+| free5gc | v4.2.3 | image tag |
+| free-ran-ue | v2.5.0, patched for P-CSCF discovery | `FRU_VERSION` build arg |
+| PyHSS | `sha256:da53ca70…` (built 2026-08-17) | image digest — upstream publishes no version tags, only `latest` |
+| MongoDB | 4.4 | image tag |
+| Redis | 7.0 | image tag |
+
+Determined by the base image, and moves with it:
+
+| Component | Version at time of writing | From |
+|---|---|---|
+| Kamailio | 6.0.1 (`6.0.1-1+deb13u1`) | `debian:trixie-slim` |
+
+Not pinned by this repository at all:
+
+| Component | Constraint |
 |---|---|
-| free5gc | v4.2.3 |
-| gtp5g | master |
-| Kamailio | 6.x, from the Debian package |
-| PyHSS | latest |
-| free-ran-ue | v2.5.0, patched for P-CSCF discovery |
+| gtp5g | `0.9.5 ≤ version < 0.11.0` — enforced by free5gc's UPF at run time. Tested with 0.10.2. |
+
+`gtp5g` is a kernel module built from a checkout outside this repository, so
+which version you get is a property of your machine rather than of this
+project. The range above is the one the UPF actually checks; anything outside
+it is refused at startup.
 
 ## Built on
 

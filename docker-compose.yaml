@@ -354,7 +354,7 @@ services:
   # The subscriber logic and the SQLite store.
   pyhss-hss:
     container_name: poc-pyhss-hss
-    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest
+    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest@sha256:da53ca7085e907d4307162c9bdbe9b9972b5d0ecac84afeb8bdd1195bd95dad0
     env_file: ./hss/pyhss.env
     environment:
       CONTAINER_ROLE: hss
@@ -369,7 +369,7 @@ services:
   # The provisioning REST API. 04-add-ims-subscribers.sh talks to this.
   pyhss-api:
     container_name: poc-pyhss-api
-    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest
+    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest@sha256:da53ca7085e907d4307162c9bdbe9b9972b5d0ecac84afeb8bdd1195bd95dad0
     env_file: ./hss/pyhss.env
     environment:
       CONTAINER_ROLE: api
@@ -390,7 +390,7 @@ services:
   # The Cx endpoint: this is what the I-CSCF and S-CSCF will connect to.
   pyhss-diameter:
     container_name: poc-pyhss-diameter
-    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest
+    image: ghcr.io/nickvsnetworking/pyhss/pyhss:latest@sha256:da53ca7085e907d4307162c9bdbe9b9972b5d0ecac84afeb8bdd1195bd95dad0
     env_file: ./hss/pyhss.env
     environment:
       CONTAINER_ROLE: diameter
