@@ -56,6 +56,15 @@ echo
 before=$(rules pdr | python3 -c 'import json,sys; d=json.load(sys.stdin) or []; print(len(d))')
 echo "--- [1/4] before: ${before} PDRs installed ---"
 
+# From here on a reservation may exist, and it has to be given back even if
+# the checks below fail -- otherwise a failed run leaves a PCC rule installed
+# and the next run starts from a state it did not create.
+release() {
+    docker exec poc-af curl -s -o /dev/null -X POST http://localhost:8090/call/delete \
+        -H 'Content-Type: application/json' -d "{\"callId\":\"${CALL_ID}\"}" 2>/dev/null || true
+}
+trap release EXIT
+
 echo "--- [2/4] AF -> PCF: authorise the media flow ---"
 body=$(printf '{"callId":"%s","supi":"imsi-208930000000001","ueAddr":"%s","uePort":%d,"peerAddr":"%s","peerPort":%d,"bwUl":"%s","bwDl":"%s"}' \
     "${CALL_ID}" "${UE1_IP}" "${UE_PORT}" "${UE2_IP}" "${PEER_PORT}" "${BW}" "${BW}")
@@ -146,8 +155,7 @@ echo "${RESULT#* }"
 echo
 
 echo "--- [4/4] tearing the reservation down ---"
-docker exec poc-af curl -s -o /dev/null -X POST http://localhost:8090/call/delete \
-    -H 'Content-Type: application/json' -d "{\"callId\":\"${CALL_ID}\"}"
+release
 sleep 3
 after=$(rules pdr | python3 -c 'import json,sys; d=json.load(sys.stdin) or []; print(len(d))')
 echo "    ${after} PDRs installed (was ${before} before the request)"

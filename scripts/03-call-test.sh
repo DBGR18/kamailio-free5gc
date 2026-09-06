@@ -87,9 +87,17 @@ sudo timeout 120 tcpdump -i "${N3_BRIDGE}" -w "${CAP}" 'udp port 2152' >/dev/nul
 TCPDUMP_PID=$!
 sleep 2
 
+# Every step here has to be allowed to fail. This runs as the EXIT trap, and
+# under set -e a failing command does not just get skipped: it abandons the
+# rest of the trap and leaves its own status as the script's exit status. A
+# kill against a sampler that has already finished is enough to turn a passing
+# run into exit 1 while still printing PASS, and to leave the callee's SIPp
+# running because the line that stops it never gets reached.
 cleanup() {
     sudo kill "${TCPDUMP_PID}" 2>/dev/null || true
-    [ -n "${QOS_SAMPLER:-}" ] && kill "${QOS_SAMPLER}" 2>/dev/null
+    if [ -n "${QOS_SAMPLER:-}" ]; then
+        kill "${QOS_SAMPLER}" 2>/dev/null || true
+    fi
     docker exec poc-ue2 pkill sipp 2>/dev/null || true
 }
 trap cleanup EXIT
