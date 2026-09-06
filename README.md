@@ -166,7 +166,7 @@ Two web interfaces are published on the loopback address only:
 |---|---|
 | free5gc | 4.2.3 |
 | gtp5g | 0.10.2 |
-| Kamailio | 6.0.1 |
+| Kamailio | 6.1.4 |
 | PyHSS | 2.0.0 |
 | free-ran-ue | 2.5.0 |
 

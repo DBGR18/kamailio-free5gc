@@ -13,6 +13,19 @@
 #     bindings rather than plain SIP AoRs
 FROM debian:trixie-slim
 
+# Kamailio comes from the project's own repository rather than from Debian.
+# Trixie ships 6.0.1, which is a year and a half behind; the 6.1 branch here is
+# current and carries the same set of module packages.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+ && install -d -m 0755 /etc/apt/keyrings \
+ && curl -fsSL https://deb.kamailio.org/kamailiodebkey.gpg \
+      -o /etc/apt/keyrings/kamailio.asc \
+ && echo "deb [signed-by=/etc/apt/keyrings/kamailio.asc] \
+http://deb.kamailio.org/kamailio61 trixie main" \
+      > /etc/apt/sources.list.d/kamailio.list \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       kamailio \
