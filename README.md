@@ -39,12 +39,8 @@ graph LR
 
 | | |
 |---|---|
-| OS | Linux, with a kernel you can build out-of-tree modules for |
-| Docker | Engine with the Compose v2 plugin |
-| Kernel headers | `linux-headers-$(uname -r)` |
 | gtp5g | A checkout of [free5gc/gtp5g](https://github.com/free5gc/gtp5g) — `~/gtp5g` by default, or set `GTP5G_DIR` |
 | Go | Optional, used by the tests to read the user plane's rules |
-| sudo | Passwordless, for loading the module and capturing packets |
 
 `gtp5g` is a kernel module and is deliberately not vendored here: it has to be
 rebuilt after every kernel upgrade, so it belongs outside the repository.
@@ -136,17 +132,6 @@ Two subscribers are provisioned, sharing one PLMN:
 | Subscribers | IMSI `208930000000001` and `208930000000002` |
 | Public identities | `sip:<IMSI>@ims.mnc093.mcc208.3gppnetwork.org` |
 | DNNs | `internet` (10.60/16, 10.61/16) and `ims` (10.62/16) |
-
-Key material comes from 3GPP's published test values and lives in
-`scripts/lib-keys.sh`, which is the single place it is defined — the other
-copies are derived from it.
-
-Two web interfaces are published on the loopback address only:
-
-| | |
-|---|---|
-| free5gc WebConsole | http://127.0.0.1:5000 |
-| PyHSS API | http://127.0.0.1:8080 |
 
 ## Documentation
 
